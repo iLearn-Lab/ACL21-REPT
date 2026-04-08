@@ -1,58 +1,172 @@
-# REPT
+# REPT: Bridging Language Models and Machine Reading Comprehension via Retrieval-Based Pre-training
 
-The pre-trained BERT and RoBERTa models can be downloaded from [here](https://drive.google.com/file/d/17ON33PBioseXMvM_mSunaUh9g-FhTJBC/view?usp=sharing).
+> A novel retrieval-based pre-training approach to bridge the gap between pre-trained language models and machine reading comprehension by strengthening evidence extraction capabilities.
 
-## Pre-Training Setup
-### Prepare Dataset for Pre-Training
+## Authors
 
-Firstly, you should download the Wikipedia dump by your self and do custom pre-processing. We provide a script to download the dump 
-and do necessary pre-processing:
+**Fangkai Jiao**<sup>1</sup>, **Yangyang Guo**<sup>1</sup>, **Yilin Niu**<sup>2</sup>, **Feng Ji**<sup>3</sup>, **Feng-Lin Li**<sup>3</sup>, **Liqiang Nie**<sup>1*</sup>
+
+<sup>1</sup> School of Computer Science and Technology, Shandong University, Qingdao, China  
+<sup>2</sup> Department of Computer Science and Technology, Tsinghua University, Beijing, China  
+<sup>3</sup> Damo Academy, Alibaba Group, Hangzhou, China  
+\* Corresponding author
+
+## Links
+
+  - **Paper**: [ACL/IJCNLP 2021 Findings](https://doi.org/10.18653/v1/2021.findings-acl.13) | [arXiv](https://arxiv.org/abs/2105.04201)
+  - **Code Repository**: [GitHub](https://github.com/iLearn-Lab/ACL21-REPT)
+  - **Checkpoints**: [Google Drive](https://drive.google.com/file/d/17ON33PBioseXMvM_mSunaUh9g-FhTJBC/view?usp=sharing)
+
+-----
+
+## Table of Contents
+
+  - [Updates](#updates)
+  - [Introduction](#introduction)
+  - [Highlights](#highlights)
+  - [Method / Framework](#method--framework)
+  - [Project Structure](#project-structure)
+  - [Installation](#installation)
+  - [Checkpoints / Models](#checkpoints--models)
+  - [Dataset / Benchmark](#dataset--benchmark)
+  - [Usage](#usage)
+  - [Experiments Scripts and Configs](#experiments-scripts-and-configs)
+  - [Citation](#citation)
+  - [Acknowledgement](#acknowledgement)
+  - [License](#license)
+
+-----
+
+## Updates
+
+  - [05/2021] Initial release of the paper on arXiv.
+  - [05/2021] Release of code and pre-trained checkpoints (BERT and RoBERTa).
+
+-----
+
+## Introduction
+
+This is the official implementation of the paper **REPT: Bridging Language Models and Machine Reading Comprehension via Retrieval-Based Pre-training**.
+
+Pre-trained Language Models (PLMs) often struggle with evidence extraction, which requires reasoning across multiple sentences in Machine Reading Comprehension (MRC). To address this, we propose **REPT**, a framework that introduces two self-supervised tasks: **Surrounding Sentences Prediction (SSP)** and **Retrieval-Based Masked Language Modeling (RMLM)**. These tasks allow PLMs to learn evidence extraction during pre-training, which is then seamlessly inherited by downstream MRC tasks.
+
+-----
+
+## Highlights
+
+  - **Effective Evidence Extraction**: Specifically designed to enhance reasoning across multiple sentences without explicit human supervision.
+  - **Cross-Architecture Compatibility**: Successfully applied to both BERT and RoBERTa backbones.
+  - **Robust Performance**: Outperforms standard PLMs on five major MRC benchmarks including RACE, DREAM, Multi-RC, Hotpot QA, and SQuAD 2.0.
+
+-----
+
+## Method / Framework
+
+![Framework](./assets/REPT-Framework.png)
+
+The REPT framework utilizes a pre-trained Transformer encoder and a multi-head attention-based query generator. It employs sentence-level retrieval for the SSP task and document-level retrieval for the RMLM task, ensuring the model learns to identify and utilize relevant context for answer prediction.
+
+-----
+
+## Project Structure
+
+```text
+.
+├── configs/               # Configuration files for pre-training and fine-tuning
+├── processors/            # Data processing and Wikipedia pre-processing scripts
+├── scripts/               # Bash scripts for task-specific fine-tuning
+├── main_wiki_pretrain.py  # Standard pre-training entry point
+└── ...
 ```
+
+-----
+
+## Installation
+
+### 1. Clone the repository
+
+```bash
+git clone https://github.com/iLearn-Lab/ACL21-REPT
+cd ACL21-REPT
+```
+
+### 2. Environment Setup
+
+The code requires PyTorch. We recommend the following versions used in our experiments:
+
+  - **Pre-training**: `torch==1.6.0` (or `torch==1.5.1` for specific distributed environments).
+  - **Dependencies**: `transformers`, `numpy`, `scipy`.
+
+-----
+
+## Checkpoints / Models
+
+Pre-trained BERT and RoBERTa models are available for download:
+
+  - **Download Link**: [Google Drive Checkpoints](https://drive.google.com/file/d/17ON33PBioseXMvM_mSunaUh9g-FhTJBC/view?usp=sharing)
+
+Place the downloaded checkpoints in your local directory and update the `model_name_or_path` in the relevant `configs/` files.
+
+-----
+
+## Dataset / Benchmark
+
+### Pre-training Data
+
+We use the English Wikipedia dump. To prepare the data:
+
+1.  Download the Wikipedia dump.
+2.  Run the pre-processing script:
+
+<!-- end list -->
+
+```bash
 cd processors
 python wiki_en_pretrain_processor.py
 ```
-You can change the tokenizer you used and some basic settings in the script by yourself.
 
-### Data Construction
+### Downstream Benchmarks
 
-Run the following script:
-```
-python processors/wiki_en_mask_shuffle_wk5_mp.py \\
-    --input_file <the wikipedia data file> \\
-    --seed 42 \\
-    --keep_prob 0.7 \\  # keep 70% sentences as the passage.
-    --ratio (0.8,0.1,0.3,0.0,0.0,0.0)  # 80% entities for mask and 10 entities for replacement. The same meaning for noun and pronouns.
+The model is evaluated on:
+
+  - **Multiple Choice**: RACE, DREAM, ReClor, Multi-RC.
+  - **Span Extraction**: Hotpot QA, SQuAD 2.0.
+
+-----
+
+## Usage
+
+### 1. Pre-training Data Construction
+
+Construct the training samples with specific masking strategies:
+
+```bash
+python processors/wiki_en_mask_shuffle_wk5_mp.py \
+    --input_file <path_to_wiki_data> \
+    --seed 42 \
+    --keep_prob 0.7 \
+    --ratio "(0.8,0.1,0.3,0.0,0.0,0.0)"
 ```
 
-You can change the hyper-parameters by yourself.
+### 2. Run Pre-training
 
-### Run Pre-Training
+```bash
+python main_wiki_pretrain.py --config <path_to_config_json>
+```
 
-There are two pre-training scripts:
-```
-main_wiki_pretrain.py
-main_wiki_pretrain_distrib_pai_volume.py
-```
-The first need ``torch==1.6.0`` while the second need ``torch==1.5.1``.
-We used the second one to pre-train all the models on **Alibaba PAI**. As a result, there are some modules not available, 
-since they are provided to PAI users only, e.g., 
-```
-torch_save_to_oss, set_bucket_dir, load_buffer_from_oss, json_save_to_oss
-```
-you need to use the normal operations such as ``torch.save`` or ``json.dump`` to replace them.  
-Then you can run following command to pre-train your own model:
-```
-python main_wiki_pretrain_distrib_pai_volume.py --config <pre-training config file>
-```
-The config files containing the detailed hyper-parameters are listed in the next section.
+### 3. Fine-tuning
 
-### Fine-tuning
-For fine-tuning, use either
+Execute the provided bash scripts for specific tasks:
+
+```bash
+# Example for RACE
+bash scripts/race/bert_iter_sr_mlm_v1.sh
+
+# Example for Multi-RC
+python main_multirc_torch151.py --config configs/multirc/mlm_baseline/bert-base-sc-v1-mlm-2-0-20k.json
 ```
-python main_multirc_torch151.py --config <fine-tuning config>
-```
-or directly run the corresponding bash script under ``scripts/``.  
-The configs or bash scripts for specific tasks are also listed below.
+
+-----
 
 ## Experiments Scripts and Configs
 
@@ -142,26 +256,31 @@ The configs or bash scripts for specific tasks are also listed below.
 |  RoBERTa-Q w. R/S       |  scripts/squad/iter_roberta_qa_v1.sh |
 
 
-### Citation
 
-Please kindly cite our paper if the work is helpful.
+## Citation
 
-```
-@inproceedings{Jiao21rept,
-  author    = {Fangkai Jiao and
-               Yangyang Guo and
-               Yilin Niu and
-               Feng Ji and
-               Feng{-}Lin Li and
-               Liqiang Nie},
-  title     = {{REPT:} Bridging Language Models and Machine Reading Comprehension
-               via Retrieval-Based Pre-training},
-  booktitle = {Findings of the Association for Computational Linguistics: {ACL/IJCNLP}},
-  series    = {Findings of {ACL}},
-  volume    = {{ACL/IJCNLP} 2021},
-  pages     = {150--163},
-  publisher = {{ACL}},
-  year      = {2021},
-  url       = {https://doi.org/10.18653/v1/2021.findings-acl.13},
+```bibtex
+@inproceedings{jiao-etal-2021-rept,
+    title = "{REPT}: Bridging Language Models and Machine Reading Comprehension via Retrieval-Based Pre-training",
+    author = "Jiao, Fangkai and Guo, Yangyang and Niu, Yilin and Ji, Feng and Li, Feng-Lin and Nie, Liqiang",
+    booktitle = "Findings of the Association for Computational Linguistics: ACL-IJCNLP 2021",
+    month = aug,
+    year = "2021",
+    publisher = "Association for Computational Linguistics",
+    url = "https://aclanthology.org/2021.findings-acl.13",
+    doi = "10.18653/v1/2021.findings-acl.13",
+    pages = "150--163"
 }
 ```
+
+-----
+
+## Acknowledgement
+
+This work was supported by the National Key Research and Development Project of New Generation Artificial Intelligence and the Alibaba Research Intern Program.
+
+-----
+
+## 📄 License
+
+This project is released under the terms of the [LICENSE](./LICENSE) file included in this repository.
